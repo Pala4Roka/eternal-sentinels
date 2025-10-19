@@ -1,127 +1,79 @@
 import React, { useState, useEffect, useRef } from 'react';
-
 import './VideoBackground.css';
 
 export default function VideoBackground({ isTalking, emotion }) {
+  const [currentVideo, setCurrentVideo] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const videoRef1 = useRef(null);
+  const videoRef2 = useRef(null);
 
-const [currentVideo, setCurrentVideo] = useState(0);
+  const videos = [
+    '/videos/video1.mp4',
 
-const [isTransitioning, setIsTransitioning] = useState(false);
+    '/videos/video2.mp4',
 
-const videoRef = useRef(null);
+    '/videos/video3.mp4',
 
-const videoBaseUrl = process.env.REACT_APP_VIDEO_BASE_URL || '';
+    '/videos/video4.mp4',
 
-const videos = [
+    '/videos/video5.mp4',
 
-`${videoBaseUrl}/videos/video1.mp4`,
+    '/videos/video6.mp4',
 
-`${videoBaseUrl}/videos/video2.mp4`,
+    '/videos/video7.mp4'
+  ];
 
-`${videoBaseUrl}/videos/video3.mp4`,
+  useEffect(() => {
+    // Switch videos every 30 seconds with glitch transition
+    const interval = setInterval(() => {
+      setIsTransitioning(true);
+      setTimeout(() => {
+        setCurrentVideo(prev => (prev + 1) % videos.length);
+        setIsTransitioning(false);
+      }, 500);
+    }, 30000);
 
-`${videoBaseUrl}/videos/video4.mp4`,
+    return () => clearInterval(interval);
+  }, []);
 
-`${videoBaseUrl}/videos/video5.mp4`,
+  // Add pulsing effect when talking
+  const containerClass = `video-background-container ${isTalking ? 'talking' : ''} ${isTransitioning ? 'glitch' : ''}`;
 
-`${videoBaseUrl}/videos/video6.mp4`,
+  return (
+    <div className={containerClass}>
+      {/* Glitch overlay effect */}
+      {isTransitioning && (
+        <div className="glitch-overlay">
+          <div className="glitch-line"></div>
+          <div className="glitch-line"></div>
+          <div className="glitch-line"></div>
+        </div>
+      )}
 
-`${videoBaseUrl}/videos/video7.mp4`,
+      {/* Video 1 */}
+      <video
+        ref={videoRef1}
+        className={`video-layer ${currentVideo === 0 ? 'active' : ''}`}
+        src={videos[0]}
+        autoPlay
+        loop
+        muted
+        playsInline
+      />
 
-`${videoBaseUrl}/videos/video8.mp4`, // Добавьте эту строку
+      {/* Video 2 */}
+      <video
+        ref={videoRef2}
+        className={`video-layer ${currentVideo === 1 ? 'active' : ''}`}
+        src={videos[1]}
+        autoPlay
+        loop
+        muted
+        playsInline
+      />
 
-`${videoBaseUrl}/videos/video9.mp4` // Добавьте эту строку
-
-];
-
-const handleVideoEnd = () => {
-
-console.log('Video ended');
-
-setIsTransitioning(true);
-
-
-setTimeout(() => {
-
-const nextVideo = (currentVideo + 1) % videos.length;
-
-setCurrentVideo(nextVideo);
-
-setIsTransitioning(false);
-
-
-if (videoRef.current) {
-
-videoRef.current.src = videos[nextVideo];
-
-videoRef.current.load();
-
-videoRef.current.play().catch(err => console.log('Play error:', err));
-
-}
-
-}, 500);
-
-};
-
-useEffect(() => {
-
-if (videoRef.current) {
-
-videoRef.current.src = videos[currentVideo];
-
-videoRef.current.load();
-
-}
-
-}, []);
-
-const containerClass = `video-background-container ${isTalking ? 'talking' : ''} ${isTransitioning ? 'glitch' : ''}`;
-
-return (
-
-<div className={containerClass}>
-
-{isTransitioning && (
-
-<div className="glitch-overlay">
-
-<div className="glitch-line"></div>
-
-<div className="glitch-line"></div>
-
-<div className="glitch-line"></div>
-
-</div>
-
-)}
-
-<video
-
-ref={videoRef}
-
-className="video-layer active"
-
-autoPlay
-
-muted
-
-playsInline
-
-onEnded={handleVideoEnd}
-
-preload="auto"
-
->
-
-<source src={videos[currentVideo]} type="video/mp4" />
-
-Ваш браузер не поддерживает видео.
-
-</video>
-
-</div>
-
-);
-
+      {/* Emotion overlay */}
+      <div className={`emotion-overlay emotion-${emotion}`}></div>
+    </div>
+  );
 }
