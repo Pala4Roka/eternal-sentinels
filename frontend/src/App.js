@@ -98,7 +98,7 @@ function App() {
             <Route
               path="/profile"
               element={
-                user ? <ProfilePage user={user} /> : <Navigate to="/login" />
+                user ? <ProfilePage user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
               }
             />
             <Route

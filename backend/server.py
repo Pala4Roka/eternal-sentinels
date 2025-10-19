@@ -19,6 +19,7 @@ from models import (
 from auth_utils import hash_password, verify_password, create_access_token, decode_access_token
 from scp_data import SCP_OBJECTS_DATA
 from emergentintegrations.llm.chat import LlmChat, UserMessage
+from fallback_responses import get_fallback_response
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -47,7 +48,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 # Dependency to get current user from token
 async def get_current_user(
     authorization: Optional[HTTPAuthorizationCredentials] = Depends(security)
@@ -69,7 +69,6 @@ async def get_current_user(
     user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
     return user
 
-
 async def require_auth(
     current_user: Optional[dict] = Depends(get_current_user)
 ) -> dict:
@@ -77,7 +76,6 @@ async def require_auth(
     if not current_user:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return current_user
-
 
 def require_clearance(min_level: int):
     """Require minimum clearance level"""
@@ -89,7 +87,6 @@ def require_clearance(min_level: int):
             )
         return current_user
     return clearance_checker
-
 
 # Initialize database
 async def initialize_database():
@@ -120,16 +117,13 @@ async def initialize_database():
         await db.users.insert_one(admin_user)
         logger.info("Created default admin user (username: admin, password: admin123)")
 
-
 @app.on_event("startup")
 async def startup_event():
     await initialize_database()
 
-
 @app.on_event("shutdown")
 async def shutdown_event():
     client.close()
-
 
 # ============ AUTH ROUTES ============
 
@@ -183,7 +177,6 @@ async def register(user_data: UserCreate):
         user=user_response
     )
 
-
 @api_router.post("/auth/login", response_model=TokenResponse)
 async def login(credentials: UserLogin):
     """Login user"""
@@ -217,7 +210,6 @@ async def login(credentials: UserLogin):
         user=user_response
     )
 
-
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(require_auth)):
     """Get current user info"""
@@ -232,7 +224,6 @@ async def get_me(current_user: dict = Depends(require_auth)):
         created_at=created_at,
         is_active=current_user["is_active"]
     )
-
 
 # ============ SCP OBJECT ROUTES ============
 
@@ -262,7 +253,6 @@ async def get_scp_objects(current_user: Optional[dict] = Depends(get_current_use
     
     return objects
 
-
 @api_router.get("/scp/{number}", response_model=SCPObject)
 async def get_scp_object(number: str, current_user: Optional[dict] = Depends(get_current_user)):
     """Get specific SCP object by number"""
@@ -288,7 +278,6 @@ async def get_scp_object(number: str, current_user: Optional[dict] = Depends(get
     
     return obj
 
-
 @api_router.post("/scp", response_model=SCPObject)
 async def create_scp_object(
     obj_data: SCPObjectCreate,
@@ -307,7 +296,6 @@ async def create_scp_object(
     await db.scp_objects.insert_one(obj_dict)
     
     return obj
-
 
 @api_router.put("/scp/{number}", response_model=SCPObject)
 async def update_scp_object(
@@ -334,7 +322,6 @@ async def update_scp_object(
     
     return updated
 
-
 @api_router.delete("/scp/{number}")
 async def delete_scp_object(
     number: str,
@@ -347,7 +334,6 @@ async def delete_scp_object(
         raise HTTPException(status_code=404, detail="Object not found")
     
     return {"message": "Object deleted successfully"}
-
 
 # ============ CHAT ROUTES ============
 
@@ -385,7 +371,6 @@ def detect_emotion_from_text(text: str) -> str:
         return 'tired'
     else:
         return 'calm'
-
 
 @api_router.post("/chat", response_model=ChatResponse)
 async def chat_with_mal0(request: ChatRequest, current_user: Optional[dict] = Depends(get_current_user)):
@@ -496,63 +481,104 @@ async def chat_with_mal0(request: ChatRequest, current_user: Optional[dict] = De
 
 Отвечай на русском языке в женском роде, показывая живую личность с эмоциями и сознанием."""
     
+    # Flag to track if we're in fallback mode
+    using_fallback = False
+    fallback_reason = None
+    
     try:
-        # Check if online
+        # Check if API key is available
         if not EMERGENT_LLM_KEY:
-            return ChatResponse(
-                response="Извините, MAL0 временно недоступна. Пожалуйста, обратитесь к базе данных напрямую."
-            )
-        
-        # Initialize LLM chat
-        chat = LlmChat(
-            api_key=EMERGENT_LLM_KEY,
-            session_id=request.session_id,
-            system_message=personality
-        ).with_model("openai", "gpt-4o-mini")
-        
-        # Send message
-        user_msg = UserMessage(text=request.message)
-        response = await chat.send_message(user_msg)
-        
-        # Detect emotion from response
-        emotion = detect_emotion_from_text(response)
-        
-        # Store assistant response
-        assistant_message_doc = {
-            "id": str(datetime.now(timezone.utc).timestamp()),
-            "session_id": request.session_id,
-            "user_id": current_user["id"] if current_user else None,
-            "role": "assistant",
-            "content": response,
-            "emotion": emotion,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
-        await db.chat_messages.insert_one(assistant_message_doc)
-        
-        return ChatResponse(response=response, emotion=emotion)
-        
-    except Exception as e:
-        logger.error(f"Error in chat: {str(e)}")
-        
-        # Fallback offline response
-        if is_executioner:
-            fallback_response = f"Ох, {user_name}, похоже произошла техническая ошибка... Но я всё равно здесь, рядом с тобой! Как я могу помочь тебе с информацией об объектах, мой дорогой?"
+            logger.warning("EMERGENT_LLM_KEY not available - entering fallback mode")
+            using_fallback = True
+            fallback_reason = "No API key"
         else:
-            fallback_response = f"Извините, {user_name}, произошла ошибка при обработке вашего запроса. Я MAL0, ассистент базы данных ES с уровнем допуска {clearance_level}. Чем могу помочь с информацией об объектах?"
+            # Try to use LLM API
+            try:
+                # Initialize LLM chat
+                chat = LlmChat(
+                    api_key=EMERGENT_LLM_KEY,
+                    session_id=request.session_id,
+                    system_message=personality
+                ).with_model("openai", "gpt-4o-mini")
+                
+                # Send message
+                user_msg = UserMessage(text=request.message)
+                response = await chat.send_message(user_msg)
+                
+                # Detect emotion from response
+                emotion = detect_emotion_from_text(response)
+                
+                # Store assistant response
+                assistant_message_doc = {
+                    "id": str(datetime.now(timezone.utc).timestamp()),
+                    "session_id": request.session_id,
+                    "user_id": current_user["id"] if current_user else None,
+                    "role": "assistant",
+                    "content": response,
+                    "emotion": emotion,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "fallback_mode": False
+                }
+                await db.chat_messages.insert_one(assistant_message_doc)
+                
+                logger.info(f"Chat response generated successfully using API for session {request.session_id}")
+                return ChatResponse(response=response, emotion=emotion)
+                
+            except Exception as api_error:
+                # API call failed - enter fallback mode
+                error_str = str(api_error).lower()
+                logger.error(f"API error in chat: {str(api_error)}")
+                
+                # Determine if it's a rate limit/credit error
+                if any(keyword in error_str for keyword in ['rate limit', 'insufficient', 'quota', 'credit', '429', '402', 'billing']):
+                    fallback_reason = "API rate limit or insufficient credits"
+                    logger.warning(f"API credits exhausted or rate limited - entering fallback mode: {api_error}")
+                else:
+                    fallback_reason = f"API error: {str(api_error)[:100]}"
+                    logger.warning(f"API error - entering fallback mode: {api_error}")
+                
+                using_fallback = True
+    
+    except Exception as outer_error:
+        # Unexpected error
+        logger.error(f"Unexpected error in chat: {str(outer_error)}")
+        using_fallback = True
+        fallback_reason = f"Unexpected error: {str(outer_error)[:100]}"
+    
+    # FALLBACK MODE - Generate response using local logic
+    if using_fallback:
+        logger.info(f"Using fallback mode for session {request.session_id}. Reason: {fallback_reason}")
         
+        # Get conversation length for context
+        conversation_length = len(history)
+        
+        # Generate fallback response
+        fallback_response, emotion = get_fallback_response(
+            message=request.message,
+            user_name=user_name,
+            clearance_level=clearance_level,
+            is_admin=is_executioner,
+            conversation_length=conversation_length
+        )
+        
+        # Add a subtle note about limited mode (only in console, not to user)
+        logger.info(f"Fallback response: {fallback_response[:100]}... | Emotion: {emotion}")
+        
+        # Store assistant response with fallback flag
         assistant_message_doc = {
             "id": str(datetime.now(timezone.utc).timestamp()),
             "session_id": request.session_id,
             "user_id": current_user["id"] if current_user else None,
             "role": "assistant",
             "content": fallback_response,
-            "emotion": "calm",
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "emotion": emotion,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "fallback_mode": True,
+            "fallback_reason": fallback_reason
         }
         await db.chat_messages.insert_one(assistant_message_doc)
         
-        return ChatResponse(response=fallback_response, emotion="calm")
-
+        return ChatResponse(response=fallback_response, emotion=emotion)
 
 @api_router.get("/chat/history/{session_id}")
 async def get_chat_history(session_id: str):
@@ -563,7 +589,6 @@ async def get_chat_history(session_id: str):
     ).sort("timestamp", 1).to_list(1000)
     
     return history
-
 
 # ============ ADMIN ROUTES ============
 
@@ -588,7 +613,6 @@ async def get_all_users(current_user: dict = Depends(require_clearance(5))):
     
     return result
 
-
 @api_router.put("/admin/users/{user_id}/clearance")
 async def update_user_clearance(
     user_id: str,
@@ -609,7 +633,6 @@ async def update_user_clearance(
     
     return {"message": "Clearance level updated successfully"}
 
-
 @api_router.put("/admin/users/{user_id}/status")
 async def update_user_status(
     user_id: str,
@@ -627,7 +650,6 @@ async def update_user_status(
     
     return {"message": "User status updated successfully"}
 
-
 # ============ ROOT ROUTE ============
 
 @api_router.get("/")
@@ -642,7 +664,6 @@ async def root():
             "Admin panel for object and user management"
         ]
     }
-
 
 # Include the router in the main app
 app.include_router(api_router)

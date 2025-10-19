@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../api';
 import './ProfilePage.css';
 
-export default function ProfilePage({ user }) {
+export default function ProfilePage({ user, onLogout }) {
   const navigate = useNavigate();
   const [userData, setUserData] = useState(user);
   const [loading, setLoading] = useState(false);
@@ -77,6 +77,13 @@ export default function ProfilePage({ user }) {
     setTimeout(() => setMessage(''), 3000);
   };
 
+  const handleLogout = () => {
+    if (onLogout) {
+      onLogout(); // Вызываем функцию из App.js для обновления состояния
+    }
+    navigate('/login');
+  };
+
   const getClearanceLevelName = (level) => {
     const levels = {
       1: 'Threat',
@@ -110,12 +117,20 @@ export default function ProfilePage({ user }) {
   return (
     <div className="profile-page">
       <div className="profile-container">
-        <button 
-          className="back-button"
-          onClick={() => navigate('/')}
-        >
-          ← Вернуться на главную
-        </button>
+        <div className="profile-top-buttons">
+          <button 
+            className="back-button"
+            onClick={() => navigate('/')}
+          >
+            ← Вернуться на главную
+          </button>
+          <button 
+            className="logout-button"
+            onClick={handleLogout}
+          >
+            🚪 Выход
+          </button>
+        </div>
         
         <div className="profile-header">
           <div className="profile-avatar">

@@ -1,0 +1,36 @@
+# Core FastAPI
+fastapi>=0.110.0
+uvicorn>=0.25.0
+python-multipart
+
+# Database
+motor>=3.3.0
+pymongo>=4.5.0
+
+# Auth
+python-jose[cryptography]
+PyJWT>=2.10.0
+bcrypt>=4.1.0
+passlib>=1.7.4
+
+# Config
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+email-validator>=2.0.0
+
+# AI (без жестких версий)
+google-generativeai
+openai
+grpcio
+grpcio-status
+
+# AWS
+boto3
+
+# Utils
+requests>=2.31.0
+requests-oauthlib>=2.0.0
+python-dateutil
+numpy
+pandas
+tzdata

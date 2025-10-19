@@ -15,10 +15,18 @@
   position: relative;
 }
 
-.back-button {
+.profile-top-buttons {
   position: absolute;
   top: 20px;
   left: 20px;
+  right: 20px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  z-index: 10;
+}
+
+.back-button {
   padding: 10px 20px;
   background: rgba(59, 130, 246, 0.8);
   border: 1px solid #3b82f6;
@@ -35,6 +43,25 @@
   transform: translateX(-5px);
   box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
 }
+
+.logout-button {
+  padding: 10px 20px;
+  background: rgba(220, 38, 38, 0.8);
+  border: 1px solid #dc2626;
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+}
+
+.logout-button:hover {
+  background: #dc2626;
+  transform: translateX(5px);
+  box-shadow: 0 0 15px rgba(220, 38, 38, 0.5);
+}
+
 
 .profile-header {
   text-align: center;
