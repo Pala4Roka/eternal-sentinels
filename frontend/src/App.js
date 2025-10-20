@@ -66,6 +66,9 @@ function App() {
             setShowAdmin(false);
             handleLogout();
           }}
+          onBackToHome={() => {
+            setShowAdmin(false);
+          }}
         />
       </div>
     );

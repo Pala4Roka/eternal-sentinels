@@ -202,4 +202,7 @@ body {
   .main-content {
     padding: 1rem;
   }
+}/* Hide Emergent badge */
+#emergent-badge {
+  display: none !important;
 }

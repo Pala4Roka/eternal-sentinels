@@ -46,13 +46,6 @@ export default function DossierCarousel({ objects, onObjectClick }) {
   return (
     <div className="dossier-carousel">
       <div className="carousel-container">
-        <button 
-          className="carousel-btn carousel-btn-prev" 
-          onClick={handlePrev}
-          disabled={isTransitioning}
-        >
-          ‹
-        </button>
 
         <div className="carousel-track">
           {visibleObjects.map((obj, idx) => (
@@ -83,30 +76,10 @@ export default function DossierCarousel({ objects, onObjectClick }) {
           ))}
         </div>
 
-        <button 
-          className="carousel-btn carousel-btn-next" 
-          onClick={handleNext}
-          disabled={isTransitioning}
-        >
-          ›
-        </button>
+        
       </div>
 
-      <div className="carousel-indicators">
-        {objects.map((_, idx) => (
-          <button
-            key={idx}
-            className={`carousel-indicator ${idx === currentIndex ? 'active' : ''}`}
-            onClick={() => {
-              if (!isTransitioning) {
-                setIsTransitioning(true);
-                setCurrentIndex(idx);
-                setTimeout(() => setIsTransitioning(false), 500);
-              }
-            }}
-          />
-        ))}
-      </div>
+
     </div>
   );
 }

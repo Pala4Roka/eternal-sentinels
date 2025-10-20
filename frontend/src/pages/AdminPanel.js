@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { adminAPI, scpAPI } from '../api';
 import './AdminPanel.css';
 
-export default function AdminPanel({ currentUser, onLogout }) {
+export default function AdminPanel({ currentUser, onLogout, onBackToHome }) {
   const [activeTab, setActiveTab] = useState('users');
   const [users, setUsers] = useState([]);
   const [objects, setObjects] = useState([]);
@@ -10,6 +10,18 @@ export default function AdminPanel({ currentUser, onLogout }) {
   const [error, setError] = useState('');
   const [editingObject, setEditingObject] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadForm, setUploadForm] = useState({
+    number: '',
+    name: '',
+    codename: '',
+    threat_class: 'Threat',
+    description: '',
+    special_procedures: '',
+    secret_data: '',
+  });
+  const [uploadFile, setUploadFile] = useState(null);
+  const [pendingDossiers, setPendingDossiers] = useState([]);
 
   useEffect(() => {
     if (activeTab === 'users') {
@@ -104,6 +116,74 @@ export default function AdminPanel({ currentUser, onLogout }) {
     setEditForm({});
   };
 
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      // Check if file is .doc or .docx
+      const fileExtension = file.name.split('.').pop().toLowerCase();
+      if (fileExtension !== 'doc' && fileExtension !== 'docx') {
+        setError('Пожалуйста, загрузите файл в формате .doc или .docx');
+        return;
+      }
+      
+      setUploadFile(file);
+      
+      // Try to read file content (basic text extraction for .doc files)
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target.result;
+        // For simple text extraction from .doc, we'll just append to description
+        setUploadForm(prev => ({
+          ...prev,
+          description: prev.description + '\n\n[Содержимое загруженного файла]\n' + text
+        }));
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const handleUploadDossier = async () => {
+    try {
+      // Validate required fields
+      if (!uploadForm.number || !uploadForm.name || !uploadForm.codename) {
+        setError('Пожалуйста, заполните обязательные поля: номер, название и кодовое имя');
+        return;
+      }
+
+      await scpAPI.create(uploadForm);
+      setShowUploadModal(false);
+      setUploadForm({
+        number: '',
+        name: '',
+        codename: '',
+        threat_class: 'Threat',
+        description: '',
+        special_procedures: '',
+        secret_data: '',
+      });
+      setUploadFile(null);
+      fetchObjects();
+      setError('');
+    } catch (err) {
+      setError('Ошибка при загрузке досье: ' + (err.response?.data?.detail || err.message));
+    }
+  };
+
+  const handleCancelUpload = () => {
+    setShowUploadModal(false);
+    setUploadForm({
+      number: '',
+      name: '',
+      codename: '',
+      threat_class: 'Threat',
+      description: '',
+      special_procedures: '',
+      secret_data: '',
+    });
+    setUploadFile(null);
+    setError('');
+  };
+
   const handleDownloadDossier = (obj) => {
     // Create a formatted text document
     const content = `
@@ -169,9 +249,35 @@ Eternal Sentinels © 2025
             Вошел как: <strong>{currentUser.username}</strong> (Уровень допуска: {currentUser.clearance_level})
           </p>
         </div>
-        <button onClick={onLogout} className="logout-btn" data-testid="logout-btn">
-          Выйти
-        </button>
+        <div className="admin-header-actions">
+          <button 
+            onClick={onBackToHome} 
+            className="back-to-home-btn" 
+            data-testid="back-to-home-btn"
+            title="Вернуться на главную страницу"
+          >
+            🏠 Выход на главную
+          </button>
+          <button 
+            onClick={() => setShowUploadModal(true)} 
+            className="upload-dossier-btn" 
+            data-testid="upload-dossier-btn"
+            title="Загрузить новое досье"
+          >
+            📤 Загрузить досье
+          </button>
+          <button 
+            onClick={() => setActiveTab('pending')} 
+            className="view-pending-btn" 
+            data-testid="view-pending-btn"
+            title="Просмотр досье от пользователей"
+          >
+            📋 Просмотр досье от пользователей
+          </button>
+          <button onClick={onLogout} className="logout-btn" data-testid="logout-btn">
+            🚪 Выйти
+          </button>
+        </div>
       </div>
 
       <div className="admin-tabs">
@@ -188,6 +294,13 @@ Eternal Sentinels © 2025
           data-testid="objects-tab"
         >
           SCP Объекты
+        </button>
+        <button
+          className={`tab ${activeTab === 'pending' ? 'active' : ''}`}
+          onClick={() => setActiveTab('pending')}
+          data-testid="pending-tab"
+        >
+          Досье на модерации
         </button>
         <button
           className={`tab ${activeTab === 'info' ? 'active' : ''}`}
@@ -340,9 +453,161 @@ Eternal Sentinels © 2025
                 </div>
               </div>
             )}
+
+            {activeTab === 'pending' && (
+              <div className="pending-section">
+                <h2>Досье на модерации</h2>
+                <p className="section-note">Здесь будут отображаться досье, загруженные пользователями и ожидающие модерации.</p>
+                
+                {pendingDossiers.length === 0 ? (
+                  <div className="empty-state">
+                    <div className="empty-icon">📭</div>
+                    <p>Нет досье на модерации</p>
+                    <p className="empty-subtitle">Когда пользователи загрузят досье, они появятся здесь</p>
+                  </div>
+                ) : (
+                  <div className="pending-list">
+                    {pendingDossiers.map((dossier) => (
+                      <div key={dossier.id} className="pending-card">
+                        <h3>{dossier.name}</h3>
+                        <p>От пользователя: {dossier.username}</p>
+                        <button className="approve-btn">Одобрить</button>
+                        <button className="reject-btn">Отклонить</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
+
+      {/* Upload Dossier Modal */}
+      {showUploadModal && (
+        <div className="modal-overlay" onClick={handleCancelUpload}>
+          <div className="modal-content upload-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>📤 Загрузить новое досье</h2>
+              <button className="modal-close" onClick={handleCancelUpload}>✕</button>
+            </div>
+            
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Номер объекта: <span className="required">*</span></label>
+                <input
+                  type="text"
+                  value={uploadForm.number}
+                  onChange={(e) => setUploadForm({...uploadForm, number: e.target.value})}
+                  placeholder="0000"
+                  data-testid="upload-number"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Название: <span className="required">*</span></label>
+                <input
+                  type="text"
+                  value={uploadForm.name}
+                  onChange={(e) => setUploadForm({...uploadForm, name: e.target.value})}
+                  placeholder="Название объекта"
+                  data-testid="upload-name"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Кодовое имя: <span className="required">*</span></label>
+                <input
+                  type="text"
+                  value={uploadForm.codename}
+                  onChange={(e) => setUploadForm({...uploadForm, codename: e.target.value})}
+                  placeholder="Кодовое имя"
+                  data-testid="upload-codename"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Класс угрозы:</label>
+                <select
+                  value={uploadForm.threat_class}
+                  onChange={(e) => setUploadForm({...uploadForm, threat_class: e.target.value})}
+                  data-testid="upload-threat-class"
+                >
+                  <option value="Threat">Threat - Угроза</option>
+                  <option value="Hazard">Hazard - Опасность</option>
+                  <option value="Cataclysm">Cataclysm - Катаклизм</option>
+                  <option value="Collapse">Collapse - Крушение</option>
+                  <option value="Apex">Apex - Предел</option>
+                  <option value="Absolute">Absolute - Абсолют</option>
+                  <option value="Annihilation">Annihilation - Аннигиляция</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Описание:</label>
+                <textarea
+                  value={uploadForm.description}
+                  onChange={(e) => setUploadForm({...uploadForm, description: e.target.value})}
+                  rows="6"
+                  placeholder="Введите описание объекта или загрузите файл..."
+                  data-testid="upload-description"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Загрузить файл .doc/.docx:</label>
+                <div className="file-upload-area">
+                  <input
+                    type="file"
+                    accept=".doc,.docx"
+                    onChange={handleFileUpload}
+                    id="file-upload"
+                    style={{ display: 'none' }}
+                    data-testid="upload-file-input"
+                  />
+                  <label htmlFor="file-upload" className="file-upload-button">
+                    📎 Выбрать файл
+                  </label>
+                  {uploadFile && (
+                    <span className="file-name">✓ {uploadFile.name}</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Процедуры содержания:</label>
+                <textarea
+                  value={uploadForm.special_procedures}
+                  onChange={(e) => setUploadForm({...uploadForm, special_procedures: e.target.value})}
+                  rows="4"
+                  placeholder="Специальные процедуры содержания"
+                  data-testid="upload-procedures"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Секретная информация (Уровень 5):</label>
+                <textarea
+                  value={uploadForm.secret_data}
+                  onChange={(e) => setUploadForm({...uploadForm, secret_data: e.target.value})}
+                  rows="3"
+                  placeholder="Секретные данные (только для уровня допуска 5)"
+                  data-testid="upload-secret"
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-cancel" onClick={handleCancelUpload} data-testid="upload-cancel">
+                Отмена
+              </button>
+              <button className="btn-save" onClick={handleUploadDossier} data-testid="upload-submit">
+                Загрузить досье
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Modal */}
       {editingObject && (
