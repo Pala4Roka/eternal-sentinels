@@ -125,6 +125,176 @@ async def startup_event():
 async def shutdown_event():
     client.close()
 
+# ============ DOSSIER SUBMISSION ROUTES ============
+
+@api_router.post("/dossier/submit", response_model=dict)
+async def submit_dossier(
+    dossier_data: dict,
+    current_user: dict = Depends(require_auth)
+):
+    """Submit dossier for moderation"""
+    from models import DossierSubmission
+    
+    # Validate file size (max 10MB)
+    if dossier_data.get("file_size", 0) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size must not exceed 10MB")
+    
+    # Check if user already has a pending dossier
+    existing_pending = await db.dossier_submissions.find_one({
+        "user_id": current_user["id"],
+        "status": "pending"
+    })
+    
+    if existing_pending:
+        raise HTTPException(
+            status_code=400, 
+            detail="У вас уже есть досье на модерации. Дождитесь результата проверки."
+        )
+    
+    # Create dossier submission
+    dossier = DossierSubmission(
+        user_id=current_user["id"],
+        username=current_user["username"],
+        file_name=dossier_data["file_name"],
+        file_data=dossier_data["file_data"],
+        file_type=dossier_data["file_type"],
+        file_size=dossier_data["file_size"]
+    )
+    
+    dossier_dict = dossier.model_dump()
+    dossier_dict["submitted_at"] = dossier_dict["submitted_at"].isoformat()
+    
+    await db.dossier_submissions.insert_one(dossier_dict)
+    
+    logger.info(f"Dossier submitted by user {current_user['username']} ({current_user['id']})")
+    
+    return {
+        "message": "Досье успешно отправлено на модерацию",
+        "dossier_id": dossier.id
+    }
+
+@api_router.get("/dossier/my-submissions")
+async def get_my_dossier_submissions(
+    current_user: dict = Depends(require_auth)
+):
+    """Get current user's dossier submissions"""
+    submissions = await db.dossier_submissions.find(
+        {"user_id": current_user["id"]},
+        {"_id": 0, "file_data": 0}  # Exclude file_data from response for performance
+    ).sort("submitted_at", -1).to_list(100)
+    
+    # Parse dates
+    for submission in submissions:
+        if isinstance(submission.get("submitted_at"), str):
+            submission["submitted_at"] = submission["submitted_at"]
+        if submission.get("reviewed_at") and isinstance(submission["reviewed_at"], str):
+            submission["reviewed_at"] = submission["reviewed_at"]
+    
+    return submissions
+
+@api_router.get("/dossier/status")
+async def get_dossier_status(
+    current_user: dict = Depends(require_auth)
+):
+    """Get status of user's latest dossier"""
+    submission = await db.dossier_submissions.find_one(
+        {"user_id": current_user["id"]},
+        {"_id": 0, "file_data": 0},
+        sort=[("submitted_at", -1)]
+    )
+    
+    if not submission:
+        return {"has_submission": False}
+    
+    # Parse dates
+    if isinstance(submission.get("submitted_at"), str):
+        submission["submitted_at"] = submission["submitted_at"]
+    if submission.get("reviewed_at") and isinstance(submission["reviewed_at"], str):
+        submission["reviewed_at"] = submission["reviewed_at"]
+    
+    return {
+        "has_submission": True,
+        "submission": submission
+    }
+
+@api_router.get("/admin/dossiers")
+async def get_all_dossier_submissions(
+    current_user: dict = Depends(require_clearance(5))
+):
+    """Get all dossier submissions (Admin only)"""
+    submissions = await db.dossier_submissions.find(
+        {},
+        {"_id": 0, "file_data": 0}  # Exclude file_data for performance
+    ).sort("submitted_at", -1).to_list(1000)
+    
+    # Parse dates
+    for submission in submissions:
+        if isinstance(submission.get("submitted_at"), str):
+            submission["submitted_at"] = submission["submitted_at"]
+        if submission.get("reviewed_at") and isinstance(submission["reviewed_at"], str):
+            submission["reviewed_at"] = submission["reviewed_at"]
+    
+    return submissions
+
+@api_router.get("/admin/dossiers/{dossier_id}")
+async def get_dossier_detail(
+    dossier_id: str,
+    current_user: dict = Depends(require_clearance(5))
+):
+    """Get full dossier details including file data (Admin only)"""
+    submission = await db.dossier_submissions.find_one(
+        {"id": dossier_id},
+        {"_id": 0}
+    )
+    
+    if not submission:
+        raise HTTPException(status_code=404, detail="Dossier not found")
+    
+    # Parse dates
+    if isinstance(submission.get("submitted_at"), str):
+        submission["submitted_at"] = submission["submitted_at"]
+    if submission.get("reviewed_at") and isinstance(submission["reviewed_at"], str):
+        submission["reviewed_at"] = submission["reviewed_at"]
+    
+    return submission
+
+@api_router.put("/admin/dossiers/{dossier_id}/moderate")
+async def moderate_dossier(
+    dossier_id: str,
+    moderation: dict,
+    current_user: dict = Depends(require_clearance(5))
+):
+    """Approve or reject a dossier (Admin only)"""
+    
+    status = moderation.get("status")
+    if status not in ["approved", "rejected"]:
+        raise HTTPException(status_code=400, detail="Status must be 'approved' or 'rejected'")
+    
+    # Check if dossier exists
+    dossier = await db.dossier_submissions.find_one({"id": dossier_id})
+    if not dossier:
+        raise HTTPException(status_code=404, detail="Dossier not found")
+    
+    # Update dossier
+    update_data = {
+        "status": status,
+        "reviewed_at": datetime.now(timezone.utc).isoformat(),
+        "reviewed_by": current_user["username"],
+        "admin_comment": moderation.get("admin_comment", "")
+    }
+    
+    await db.dossier_submissions.update_one(
+        {"id": dossier_id},
+        {"$set": update_data}
+    )
+    
+    logger.info(f"Dossier {dossier_id} {status} by admin {current_user['username']}")
+    
+    return {
+        "message": f"Досье {status}",
+        "dossier_id": dossier_id
+    }
+
 # ============ AUTH ROUTES ============
 
 @api_router.post("/auth/register", response_model=TokenResponse)

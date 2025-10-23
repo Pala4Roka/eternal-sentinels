@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { adminAPI, scpAPI } from '../api';
+import { adminAPI, scpAPI, adminDossierAPI } from '../api';
 import './AdminPanel.css';
 
 export default function AdminPanel({ currentUser, onLogout, onBackToHome }) {
@@ -21,15 +21,18 @@ export default function AdminPanel({ currentUser, onLogout, onBackToHome }) {
     secret_data: '',
   });
   const [uploadFile, setUploadFile] = useState(null);
-  const [pendingDossiers, setPendingDossiers] = useState([]);
+  const [dossiers, setDossiers] = useState([]);
+  const [viewingDossier, setViewingDossier] = useState(null);
 
   useEffect(() => {
-    if (activeTab === 'users') {
-      fetchUsers();
-    } else if (activeTab === 'objects') {
-      fetchObjects();
-    }
-  }, [activeTab]);
+  if (activeTab === 'users') {
+    fetchUsers();
+  } else if (activeTab === 'objects') {
+    fetchObjects();
+  } else if (activeTab === 'dossiers') {
+    fetchDossiers();
+  }
+}, [activeTab]);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -74,6 +77,39 @@ export default function AdminPanel({ currentUser, onLogout, onBackToHome }) {
       setError('Failed to update status');
     }
   };
+
+  const fetchDossiers = async () => {
+  setLoading(true);
+  try {
+    const data = await adminDossierAPI.getAllDossiers();
+    setDossiers(data);
+    setError('');
+  } catch (err) {
+    setError('Failed to fetch dossiers');
+  } finally {
+    setLoading(false);
+  }
+};
+
+const handleViewDossier = async (dossierId) => {
+  try {
+    const data = await adminDossierAPI.getDossierDetail(dossierId);
+    setViewingDossier(data);
+  } catch (err) {
+    setError('Failed to load dossier details');
+  }
+};
+
+const handleModerateDossier = async (dossierId, status, adminComment = '') => {
+  try {
+    await adminDossierAPI.moderateDossier(dossierId, status, adminComment);
+    setViewingDossier(null);
+    fetchDossiers();
+    setError('');
+  } catch (err) {
+    setError('Failed to moderate dossier');
+  }
+};
 
   const handleDeleteObject = async (number) => {
     if (!window.confirm(`Удалить объект ${number}?`)) return;
@@ -295,13 +331,13 @@ Eternal Sentinels © 2025
         >
           SCP Объекты
         </button>
-        <button
-          className={`tab ${activeTab === 'pending' ? 'active' : ''}`}
-          onClick={() => setActiveTab('pending')}
-          data-testid="pending-tab"
-        >
-          Досье на модерации
-        </button>
+ <button
+  className={`tab ${activeTab === 'dossiers' ? 'active' : ''}`}
+  onClick={() => setActiveTab('dossiers')}
+  data-testid="dossiers-tab"
+>
+  Досье на модерации
+</button>
         <button
           className={`tab ${activeTab === 'info' ? 'active' : ''}`}
           onClick={() => setActiveTab('info')}
@@ -454,35 +490,210 @@ Eternal Sentinels © 2025
               </div>
             )}
 
-            {activeTab === 'pending' && (
-              <div className="pending-section">
-                <h2>Досье на модерации</h2>
-                <p className="section-note">Здесь будут отображаться досье, загруженные пользователями и ожидающие модерации.</p>
-                
-                {pendingDossiers.length === 0 ? (
-                  <div className="empty-state">
-                    <div className="empty-icon">📭</div>
-                    <p>Нет досье на модерации</p>
-                    <p className="empty-subtitle">Когда пользователи загрузят досье, они появятся здесь</p>
-                  </div>
-                ) : (
-                  <div className="pending-list">
-                    {pendingDossiers.map((dossier) => (
-                      <div key={dossier.id} className="pending-card">
-                        <h3>{dossier.name}</h3>
-                        <p>От пользователя: {dossier.username}</p>
-                        <button className="approve-btn">Одобрить</button>
-                        <button className="reject-btn">Отклонить</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+            {activeTab === 'dossiers' && (
+  <div className="dossiers-section">
+    <h2>Досье на модерации</h2>
+    <p className="section-note">Управление загруженными досье пользователей</p>
+    
+    {dossiers.length === 0 ? (
+      <div className="empty-state">
+        <div className="empty-icon">📭</div>
+        <p>Нет досье</p>
+        <p className="empty-subtitle">Когда пользователи загрузят досье, они появятся здесь</p>
+      </div>
+    ) : (
+      <div className="dossiers-list">
+        {dossiers.map((dossier) => (
+          <div 
+            key={dossier.id} 
+            className={`dossier-card status-${dossier.status}`}
+          >
+            <div className="dossier-header">
+              <div className="dossier-user">
+                <span className="user-icon">👤</span>
+                <span className="user-name">{dossier.username}</span>
               </div>
-            )}
+              <div className={`dossier-status-badge status-${dossier.status}`}>
+                {dossier.status === 'pending' && '⏳ На модерации'}
+                {dossier.status === 'approved' && '✅ Одобрено'}
+                {dossier.status === 'rejected' && '❌ Отклонено'}
+              </div>
+            </div>
+            
+            <div className="dossier-info">
+              <div className="info-row">
+                <span className="info-label">Файл:</span>
+                <span className="info-value">{dossier.file_name}</span>
+              </div>
+              <div className="info-row">
+                <span className="info-label">Размер:</span>
+                <span className="info-value">
+                  {(dossier.file_size / 1024).toFixed(2)} KB
+                </span>
+              </div>
+              <div className="info-row">
+                <span className="info-label">Отправлено:</span>
+                <span className="info-value">
+                  {new Date(dossier.submitted_at).toLocaleString('ru-RU')}
+                </span>
+              </div>
+              {dossier.reviewed_at && (
+                <div className="info-row">
+                  <span className="info-label">Проверено:</span>
+                  <span className="info-value">
+                    {new Date(dossier.reviewed_at).toLocaleString('ru-RU')}
+                  </span>
+                </div>
+              )}
+              {dossier.reviewed_by && (
+                <div className="info-row">
+                  <span className="info-label">Проверил:</span>
+                  <span className="info-value">{dossier.reviewed_by}</span>
+                </div>
+              )}
+              {dossier.admin_comment && (
+                <div className="info-row full-width">
+                  <span className="info-label">Комментарий:</span>
+                  <span className="info-value comment">{dossier.admin_comment}</span>
+                </div>
+              )}
+            </div>
+            
+            <div className="dossier-actions">
+              <button 
+                className="view-btn"
+                onClick={() => handleViewDossier(dossier.id)}
+              >
+                👁️ Просмотр
+              </button>
+              {dossier.status === 'pending' && (
+                <>
+                  <button 
+                    className="approve-btn"
+                    onClick={() => {
+                      const comment = prompt('Комментарий (необязательно):');
+                      if (comment !== null) {
+                        handleModerateDossier(dossier.id, 'approved', comment);
+                      }
+                    }}
+                  >
+                    ✅ Одобрить
+                  </button>
+                  <button 
+                    className="reject-btn"
+                    onClick={() => {
+                      const comment = prompt('Причина отклонения:');
+                      if (comment) {
+                        handleModerateDossier(dossier.id, 'rejected', comment);
+                      }
+                    }}
+                  >
+                    ❌ Отклонить
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+)}
           </>
         )}
       </div>
+{/* Dossier Viewer Modal */}
+{viewingDossier && (
+  <div className="modal-overlay" onClick={() => setViewingDossier(null)}>
+    <div className="modal-content dossier-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-header">
+        <h2>📄 Досье: {viewingDossier.file_name}</h2>
+        <button className="modal-close" onClick={() => setViewingDossier(null)}>✕</button>
+      </div>
+      
+      <div className="modal-body">
+        <div className="dossier-details">
+          <div className="detail-group">
+            <label>Пользователь:</label>
+            <p>{viewingDossier.username}</p>
+          </div>
+          <div className="detail-group">
+            <label>Тип файла:</label>
+            <p>{viewingDossier.file_type}</p>
+          </div>
+          <div className="detail-group">
+            <label>Размер:</label>
+            <p>{(viewingDossier.file_size / 1024).toFixed(2)} KB</p>
+          </div>
+          <div className="detail-group">
+            <label>Дата загрузки:</label>
+            <p>{new Date(viewingDossier.submitted_at).toLocaleString('ru-RU')}</p>
+          </div>
+        </div>
 
+        <div className="file-preview">
+          <label>Предпросмотр файла:</label>
+          {viewingDossier.file_type.startsWith('image/') ? (
+            <img 
+              src={viewingDossier.file_data} 
+              alt="Dossier preview" 
+              className="preview-image"
+            />
+          ) : viewingDossier.file_type === 'application/pdf' ? (
+            <div className="pdf-preview">
+              <p>📄 PDF файл</p>
+              <a 
+                href={viewingDossier.file_data} 
+                download={viewingDossier.file_name}
+                className="download-link"
+              >
+                Скачать файл
+              </a>
+            </div>
+          ) : (
+            <div className="file-download">
+              <p>📎 {viewingDossier.file_type}</p>
+              <a 
+                href={viewingDossier.file_data} 
+                download={viewingDossier.file_name}
+                className="download-link"
+              >
+                Скачать файл
+              </a>
+            </div>
+          )}
+        </div>
+
+        {viewingDossier.status === 'pending' && (
+          <div className="modal-actions">
+            <button 
+              className="approve-btn"
+              onClick={() => {
+                const comment = prompt('Комментарий (необязательно):');
+                if (comment !== null) {
+                  handleModerateDossier(viewingDossier.id, 'approved', comment);
+                }
+              }}
+            >
+              ✅ Одобрить
+            </button>
+            <button 
+              className="reject-btn"
+              onClick={() => {
+                const comment = prompt('Причина отклонения:');
+                if (comment) {
+                  handleModerateDossier(viewingDossier.id, 'rejected', comment);
+                }
+              }}
+            >
+              ❌ Отклонить
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
       {/* Upload Dossier Modal */}
       {showUploadModal && (
         <div className="modal-overlay" onClick={handleCancelUpload}>

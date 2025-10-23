@@ -107,3 +107,42 @@ def get_required_clearance(threat_class: str) -> int:
     # Extract base threat class name (before parentheses)
     base_threat_class = threat_class.split(" ")[0] if threat_class else ""
     return THREAT_CLASS_ACCESS.get(base_threat_class, 5)
+# Dossier Submission Models
+class DossierSubmission(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    username: str  # For easier display
+    file_name: str
+    file_data: str  # Base64 encoded file
+    file_type: str  # MIME type
+    file_size: int  # Size in bytes
+    status: str = "pending"  # pending, approved, rejected
+    submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    reviewed_at: Optional[datetime] = None
+    reviewed_by: Optional[str] = None
+    admin_comment: Optional[str] = None
+
+class DossierSubmissionCreate(BaseModel):
+    file_name: str
+    file_data: str
+    file_type: str
+    file_size: int
+
+class DossierSubmissionResponse(BaseModel):
+    id: str
+    user_id: str
+    username: str
+    file_name: str
+    file_type: str
+    file_size: int
+    status: str
+    submitted_at: datetime
+    reviewed_at: Optional[datetime] = None
+    reviewed_by: Optional[str] = None
+    admin_comment: Optional[str] = None
+
+class DossierModerationRequest(BaseModel):
+    status: str  # approved or rejected
+    admin_comment: Optional[str] = None

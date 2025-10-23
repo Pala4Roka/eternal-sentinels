@@ -140,4 +140,43 @@ export const adminAPI = {
   },
 };
 
+// Dossier API
+export const dossierAPI = {
+  submit: async (fileData) => {
+    const response = await apiClient.post('/dossier/submit', fileData);
+    return response.data;
+  },
+  
+  getMySubmissions: async () => {
+    const response = await apiClient.get('/dossier/my-submissions');
+    return response.data;
+  },
+  
+  getStatus: async () => {
+    const response = await apiClient.get('/dossier/status');
+    return response.data;
+  },
+};
+
+// Admin Dossier API
+export const adminDossierAPI = {
+  getAllDossiers: async () => {
+    const response = await apiClient.get('/admin/dossiers');
+    return response.data;
+  },
+  
+  getDossierDetail: async (dossierId) => {
+    const response = await apiClient.get(`/admin/dossiers/${dossierId}`);
+    return response.data;
+  },
+  
+  moderateDossier: async (dossierId, status, adminComment = '') => {
+    const response = await apiClient.put(`/admin/dossiers/${dossierId}/moderate`, {
+      status,
+      admin_comment: adminComment
+    });
+    return response.data;
+  },
+};
+
 export default apiClient;

@@ -500,3 +500,295 @@
     width: 100%;
   }
 }
+/* Dossiers Section Styles */
+.dossiers-section {
+  padding: 20px;
+}
+
+.dossiers-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.dossier-card {
+  background: rgba(30, 30, 30, 0.8);
+  border: 2px solid;
+  border-radius: 12px;
+  padding: 20px;
+  transition: all 0.3s ease;
+}
+
+.dossier-card.status-pending {
+  border-color: #fbbf24;
+  box-shadow: 0 0 15px rgba(251, 191, 36, 0.2);
+}
+
+.dossier-card.status-approved {
+  border-color: #22c55e;
+  box-shadow: 0 0 15px rgba(34, 197, 94, 0.2);
+}
+
+.dossier-card.status-rejected {
+  border-color: #ef4444;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
+}
+
+.dossier-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.dossier-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dossier-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-icon {
+  font-size: 24px;
+}
+
+.user-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.dossier-status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.dossier-status-badge.status-pending {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+}
+
+.dossier-status-badge.status-approved {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.dossier-status-badge.status-rejected {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.dossier-info {
+  margin-bottom: 15px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 10px;
+}
+
+.info-row.full-width {
+  flex-direction: column;
+}
+
+.info-label {
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+.info-value {
+  color: #fff;
+  font-size: 14px;
+  text-align: right;
+}
+
+.info-value.comment {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 10px;
+  border-radius: 6px;
+  text-align: left;
+  margin-top: 5px;
+}
+
+.dossier-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.view-btn,
+.approve-btn,
+.reject-btn {
+  flex: 1;
+  padding: 10px 15px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  font-size: 14px;
+}
+
+.view-btn {
+  background: rgba(246, 59, 59, 0.8);
+  color: white;
+}
+
+.view-btn:hover {
+  background: #d30202;
+  transform: translateY(-2px);
+}
+
+.approve-btn {
+  background: rgba(34, 197, 94, 0.8);
+  color: white;
+}
+
+.approve-btn:hover {
+  background: #22c55e;
+  transform: translateY(-2px);
+}
+
+.reject-btn {
+  background: rgba(239, 68, 68, 0.8);
+  color: white;
+}
+
+.reject-btn:hover {
+  background: #ef4444;
+  transform: translateY(-2px);
+}
+
+/* Dossier Modal Styles */
+.dossier-modal {
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.dossier-details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.detail-group {
+  padding: 15px;
+  background: rgba(40, 40, 40, 0.8);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.detail-group label {
+  display: block;
+  color: #9ca3af;
+  font-size: 12px;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.detail-group p {
+  color: #fff;
+  font-size: 14px;
+  margin: 0;
+}
+
+.file-preview {
+  margin-top: 20px;
+  padding: 20px;
+  background: rgba(40, 40, 40, 0.8);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.file-preview label {
+  display: block;
+  color: #9ca3af;
+  font-size: 14px;
+  margin-bottom: 15px;
+  font-weight: 600;
+}
+
+.preview-image {
+  max-width: 100%;
+  border-radius: 8px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+}
+
+.pdf-preview,
+.file-download {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.pdf-preview p,
+.file-download p {
+  color: #9ca3af;
+  font-size: 16px;
+  margin-bottom: 15px;
+}
+
+.download-link {
+  display: inline-block;
+  padding: 12px 30px;
+  background: rgba(59, 130, 246, 0.8);
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.download-link:hover {
+  background: #3b82f6;
+  transform: translateY(-2px);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-actions .approve-btn,
+.modal-actions .reject-btn {
+  flex: 1;
+  padding: 15px;
+  font-size: 16px;
+}
+
+@media (max-width: 768px) {
+  .dossiers-list {
+    grid-template-columns: 1fr;
+  }
+
+  .dossier-details {
+    grid-template-columns: 1fr;
+  }
+
+  .dossier-actions {
+    flex-direction: column;
+  }
+
+  .view-btn,
+  .approve-btn,
+  .reject-btn {
+    width: 100%;
+  }
+}
